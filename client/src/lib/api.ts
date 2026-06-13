@@ -48,6 +48,13 @@ export type PrivacyPreference = {
   description: string;
 };
 
+export type DataStatus = {
+  ready: boolean;
+  data_dir: string;
+  required_files: string[];
+  missing_files: string[];
+};
+
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://localhost:8000";
 
 async function request<T>(path: string, init?: RequestInit): Promise<T> {
@@ -60,7 +67,14 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
   });
 
   if (!response.ok) {
-    throw new Error(`API request failed: ${response.status}`);
+    let detail = `API request failed: ${response.status}`;
+    try {
+      const body = (await response.json()) as { detail?: string };
+      detail = body.detail ?? detail;
+    } catch {
+      // Keep the HTTP fallback when the server does not return JSON.
+    }
+    throw new Error(detail);
   }
 
   return response.json() as Promise<T>;
@@ -68,10 +82,16 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
 
 export const api = {
   health: () => request<{ status: string }>("/api/health"),
+  dataStatus: () => request<DataStatus>("/api/data-status"),
   products: () => request<Product[]>("/api/products"),
   recommendations: () => request<Recommendation[]>("/api/recommendations"),
   reports: () => request<CampaignReport[]>("/api/reports"),
   privacy: () => request<PrivacyPreference[]>("/api/privacy"),
+  updatePrivacy: (signal: string, enabled: boolean) =>
+    request<PrivacyPreference>(`/api/privacy/${encodeURIComponent(signal)}`, {
+      method: "PATCH",
+      body: JSON.stringify({ enabled })
+    }),
   search: (query: string, goal: MerchantGoal) =>
     request<SearchResult[]>("/api/search", {
       method: "POST",

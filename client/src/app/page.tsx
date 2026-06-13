@@ -20,16 +20,7 @@ import {
 } from "lucide-react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useEffect, useMemo, useState } from "react";
-import {
-  Bar,
-  BarChart,
-  CartesianGrid,
-  ResponsiveContainer,
-  Tooltip,
-  XAxis,
-  YAxis
-} from "recharts";
-import { api, CampaignReport, formatVnd, MerchantGoal, Recommendation, SearchResult } from "@/lib/api";
+import { api, CampaignReport, DataStatus, formatVnd, MerchantGoal, Recommendation, SearchResult } from "@/lib/api";
 
 const goalLabels: Record<MerchantGoal, string> = {
   repeat_purchase: "Repeat purchase",
@@ -54,6 +45,7 @@ export default function Home() {
   const recommendationsQuery = useQuery({ queryKey: ["recommendations"], queryFn: api.recommendations });
   const reportsQuery = useQuery({ queryKey: ["reports"], queryFn: api.reports });
   const privacyQuery = useQuery({ queryKey: ["privacy"], queryFn: api.privacy });
+  const dataStatusQuery = useQuery({ queryKey: ["data-status"], queryFn: api.dataStatus });
   const searchQueryResult = useQuery({
     queryKey: ["search", searchQuery, goal],
     queryFn: () => api.search(searchQuery, goal),
@@ -65,9 +57,14 @@ export default function Home() {
       api.updateRecommendation(id, status, undefined, reason),
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ["recommendations"] })
   });
+  const updatePrivacy = useMutation({
+    mutationFn: ({ signal, enabled }: { signal: string; enabled: boolean }) => api.updatePrivacy(signal, enabled),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["privacy"] })
+  });
 
   const recommendations = recommendationsQuery.data ?? [];
   const reports = reportsQuery.data ?? [];
+  const dataReady = dataStatusQuery.data?.ready ?? false;
   const selected = recommendations.find((item) => item.id === selectedId) ?? recommendations[0];
   const report = selected ? reports.find((item) => item.recommendation_id === selected.id) : undefined;
   const activeApproved = recommendations.filter((item) => item.status === "approved").length;
@@ -84,27 +81,34 @@ export default function Home() {
 
   return (
     <main>
-      <Announcement />
+      <Announcement dataStatus={dataStatusQuery.data} />
       <Hero
         activeApproved={activeApproved}
         recommendations={recommendations}
         reports={reports}
         selected={selected}
         isLoading={recommendationsQuery.isLoading}
+        dataStatus={dataStatusQuery.data}
       />
 
       <section id="cockpit" className="bg-[var(--color-parchment-canvas)] px-4 py-16 sm:px-6 lg:px-8">
         <div className="mx-auto grid w-full max-w-[1200px] gap-8">
           <SectionIntro />
+          <RealDataNotice dataStatus={dataStatusQuery.data} />
 
           <div className="grid gap-5 lg:grid-cols-[280px_minmax(0,1fr)]">
             <aside className="grid h-fit gap-5">
               <MerchantSetup goal={goal} setGoal={setGoal} />
-              <PrivacyControls preferences={privacyQuery.data ?? []} isLoading={privacyQuery.isLoading} />
+              <PrivacyControls
+                preferences={privacyQuery.data ?? []}
+                isLoading={privacyQuery.isLoading}
+                pendingSignal={updatePrivacy.isPending ? updatePrivacy.variables?.signal : undefined}
+                onToggle={(signal, enabled) => updatePrivacy.mutate({ signal, enabled })}
+              />
             </aside>
 
             <div className="grid gap-5">
-              <TopMetrics recommendations={recommendations} reports={reports} isLoading={recommendationsQuery.isLoading} />
+              <TopMetrics recommendations={recommendations} reports={reports} isLoading={recommendationsQuery.isLoading} dataReady={dataReady} />
 
               <div className="grid gap-5 xl:grid-cols-[minmax(0,1fr)_minmax(390px,0.9fr)]">
                 <RecommendationQueue
@@ -150,11 +154,15 @@ export default function Home() {
   );
 }
 
-function Announcement() {
+function Announcement({ dataStatus }: { dataStatus?: DataStatus }) {
   return (
     <div className="bg-[var(--color-aubergine)] px-4 py-3 text-[var(--color-bone)] sm:px-6 lg:px-8">
       <div className="mx-auto flex max-w-[1200px] flex-col gap-2 text-sm font-medium sm:flex-row sm:items-center sm:justify-between">
-        <span>Merchant Growth Copilot is running in mock CSV pilot mode.</span>
+        <span>
+          {dataStatus?.ready
+            ? "Merchant Growth Copilot is using real Supabase data."
+            : "Real data required: seed the required Supabase tables before using recommendations."}
+        </span>
         <a className="rounded-2xl text-sm text-[var(--color-bone)] underline-offset-4 hover:underline" href="#cockpit">
           Open cockpit
         </a>
@@ -168,13 +176,15 @@ function Hero({
   recommendations,
   reports,
   selected,
-  isLoading
+  isLoading,
+  dataStatus
 }: {
   activeApproved: number;
   recommendations: Recommendation[];
   reports: CampaignReport[];
   selected?: Recommendation;
   isLoading: boolean;
+  dataStatus?: DataStatus;
 }) {
   const averageConversion = reports.length
     ? reports.reduce((sum, item) => sum + item.conversion_lift_percent, 0) / reports.length
@@ -203,7 +213,7 @@ function Hero({
         <div className="reveal">
           <div className="mb-8 inline-flex items-center gap-2 rounded-full glass-panel px-4 py-3 text-sm font-medium">
             <ShieldCheck size={16} />
-            Human-approved AI commerce actions
+            {dataStatus?.ready ? "Real-data AI commerce actions" : "Waiting for real merchant data"}
           </div>
           <h1 className="max-w-4xl text-[48px] font-semibold leading-[0.96] tracking-normal sm:text-[64px]">
             Turn messy shop context into approved growth actions.
@@ -229,9 +239,9 @@ function Hero({
               <Database size={18} />
             </div>
             <div className="grid grid-cols-3 gap-3">
-              <HeroStat label="Actions" value={isLoading ? "--" : String(recommendations.length)} />
-              <HeroStat label="Lift" value={`${averageConversion.toFixed(1)}%`} />
-              <HeroStat label="Approved" value={String(activeApproved)} />
+              <HeroStat label="Actions" value={dataStatus?.ready ? (isLoading ? "--" : String(recommendations.length)) : "--"} />
+              <HeroStat label="Lift" value={dataStatus?.ready ? `${averageConversion.toFixed(1)}%` : "--"} />
+              <HeroStat label="Approved" value={dataStatus?.ready ? String(activeApproved) : "--"} />
             </div>
           </div>
 
@@ -241,11 +251,11 @@ function Hero({
               Why this, why now
             </div>
             <h2 className="mt-3 text-2xl font-semibold leading-tight">{selected?.title ?? "Loading recommendation"}</h2>
-            <p className="mt-3 text-sm leading-6 text-white/72">{selected?.risk_flag ?? "Preparing context from mock commerce data."}</p>
+            <p className="mt-3 text-sm leading-6 text-white/72">{selected?.risk_flag ?? "Waiting for real merchant CSV files."}</p>
           </div>
 
           <div className="glass-panel mr-0 rounded-full px-5 py-4 text-sm font-medium text-white/86 lg:mr-16">
-            Staff query: gift under 300k for office worker
+            Data source: {dataStatus?.ready ? dataStatus.data_dir : "not loaded"}
           </div>
         </div>
       </div>
@@ -274,6 +284,41 @@ function SectionIntro() {
       <p className="text-base leading-7 text-[var(--color-graphite)]">
         The panels below keep the original MVP workflow intact: configure data signals, rank recommendations, inspect evidence, approve exports, search products, and read lift.
       </p>
+    </div>
+  );
+}
+
+function RealDataNotice({ dataStatus }: { dataStatus?: DataStatus }) {
+  if (dataStatus?.ready) {
+    const sourceLabel = dataStatus.data_dir.startsWith("http") ? "Supabase source" : "CSV source";
+    return (
+      <div className="bone-card flex flex-col gap-2 p-4 sm:flex-row sm:items-center sm:justify-between">
+        <div>
+          <p className="text-sm font-medium text-[var(--color-iris)]">Real data connected</p>
+          <p className="text-sm text-[var(--color-graphite)]">{dataStatus.data_dir}</p>
+        </div>
+        <span className="rounded-lg bg-[var(--color-fog)] px-3 py-2 text-sm font-medium">{sourceLabel}</span>
+      </div>
+    );
+  }
+
+  return (
+    <div className="bone-card border-[var(--color-iris)] p-5">
+      <p className="text-sm font-medium text-[var(--color-iris)]">Real data is required</p>
+      <h3 className="mt-2 text-2xl font-semibold tracking-normal">No mock data will be used.</h3>
+      <p className="mt-2 text-sm leading-6 text-[var(--color-graphite)]">
+        Seed the required merchant data sources in <code>{dataStatus?.data_dir ?? "Supabase"}</code>. Until then, product search,
+        recommendations, privacy controls, and reports stay empty.
+      </p>
+      <div className="mt-4 flex flex-wrap gap-2">
+        {(dataStatus?.missing_files ?? ["products", "recommendations", "recommendation_products", "reports", "privacy"]).map(
+          (fileName) => (
+            <span className="rounded-full border border-[var(--color-iris)] px-3 py-1 text-xs font-medium text-[var(--color-iris)]" key={fileName}>
+              {fileName}
+            </span>
+          )
+        )}
+      </div>
     </div>
   );
 }
@@ -327,10 +372,14 @@ function MerchantSetup({
 
 function PrivacyControls({
   preferences,
-  isLoading
+  isLoading,
+  pendingSignal,
+  onToggle
 }: {
   preferences: { signal: string; enabled: boolean; description: string }[];
   isLoading: boolean;
+  pendingSignal?: string;
+  onToggle: (signal: string, enabled: boolean) => void;
 }) {
   return (
     <section className="bone-card p-4">
@@ -341,15 +390,32 @@ function PrivacyControls({
       <div className="mt-5 space-y-3">
         {isLoading ? (
           <SkeletonLines count={4} />
+        ) : preferences.length === 0 ? (
+          <EmptyPanel title="No privacy data" detail="Seed the privacy table to show real signal permissions." />
         ) : (
           preferences.map((item) => (
             <div className="rounded-2xl border border-[var(--color-fog)] bg-white p-4" key={item.signal}>
               <div className="flex items-center justify-between gap-3">
                 <span className="text-sm font-semibold">{item.signal.replace("_", " ")}</span>
-                <span className={item.enabled ? "text-xs font-medium text-[var(--color-iris)]" : "text-xs text-[var(--color-graphite)]"}>
-                  {item.enabled ? "Enabled" : "Paused"}
-                </span>
+                <button
+                  aria-label={`${item.enabled ? "Pause" : "Enable"} ${item.signal.replace("_", " ")}`}
+                  aria-pressed={item.enabled}
+                  disabled={pendingSignal === item.signal}
+                  onClick={() => onToggle(item.signal, !item.enabled)}
+                  className={`iris-focus grid h-7 w-12 shrink-0 rounded-full p-1 transition disabled:opacity-60 ${
+                    item.enabled ? "bg-[var(--color-iris)]" : "bg-[var(--color-fog)]"
+                  }`}
+                >
+                  <span
+                    className={`h-5 w-5 rounded-full bg-white shadow-sm transition ${
+                      item.enabled ? "translate-x-5" : "translate-x-0"
+                    }`}
+                  />
+                </button>
               </div>
+              <span className={item.enabled ? "mt-2 block text-xs font-medium text-[var(--color-iris)]" : "mt-2 block text-xs text-[var(--color-graphite)]"}>
+                {pendingSignal === item.signal ? "Saving..." : item.enabled ? "Enabled" : "Paused"}
+              </span>
               <p className="mt-2 text-sm leading-6 text-[var(--color-graphite)]">{item.description}</p>
             </div>
           ))
@@ -362,11 +428,13 @@ function PrivacyControls({
 function TopMetrics({
   recommendations,
   reports,
-  isLoading
+  isLoading,
+  dataReady
 }: {
   recommendations: Recommendation[];
   reports: CampaignReport[];
   isLoading: boolean;
+  dataReady: boolean;
 }) {
   const averageConversion = reports.length
     ? reports.reduce((sum, item) => sum + item.conversion_lift_percent, 0) / reports.length
@@ -375,10 +443,10 @@ function TopMetrics({
 
   return (
     <section className="grid gap-3 md:grid-cols-4">
-      <Metric label="Growth actions" value={isLoading ? "--" : String(recommendations.length)} icon={<PackageSearch size={20} />} />
-      <Metric label="Avg conversion lift" value={`${averageConversion.toFixed(1)}%`} icon={<LineChart size={20} />} />
-      <Metric label="Planning time saved" value={`${totalTime.toFixed(1)}h`} icon={<Mail size={20} />} />
-      <Metric label="Approval mode" value="Human" icon={<ShieldCheck size={20} />} />
+      <Metric label="Growth actions" value={!dataReady || isLoading ? "--" : String(recommendations.length)} icon={<PackageSearch size={20} />} />
+      <Metric label="Avg conversion lift" value={dataReady ? `${averageConversion.toFixed(1)}%` : "--"} icon={<LineChart size={20} />} />
+      <Metric label="Planning time saved" value={dataReady ? `${totalTime.toFixed(1)}h` : "--"} icon={<Mail size={20} />} />
+      <Metric label="Approval mode" value={dataReady ? "Human" : "--"} icon={<ShieldCheck size={20} />} />
     </section>
   );
 }
@@ -412,6 +480,8 @@ function RecommendationQueue({
       <div className="mt-5 space-y-3">
         {isLoading ? (
           <SkeletonLines count={3} />
+        ) : recommendations.length === 0 ? (
+          <EmptyPanel title="No recommendations loaded" detail="Seed recommendations and recommendation_products to populate this queue." />
         ) : (
           recommendations.map((item, index) => (
             <button
@@ -589,6 +659,8 @@ function SemanticSearch({
       <div className="mt-5 space-y-3">
         {isLoading ? (
           <SkeletonLines count={4} />
+        ) : results.length === 0 ? (
+          <EmptyPanel title="No product results" detail="Seed products, then search against the real catalog." />
         ) : (
           results.map((result) => (
             <article className="rounded-2xl border border-[var(--color-fog)] bg-white p-4" key={result.product.id}>
@@ -620,6 +692,7 @@ function PerformancePanel({ chartData, reports }: { chartData: { id: string; con
   const [mounted, setMounted] = useState(false);
   const moved = reports.reduce((sum, item) => sum + item.inventory_units_moved, 0);
   const repeat = reports.reduce((sum, item) => sum + item.repeat_orders, 0);
+  const maxValue = Math.max(20, ...chartData.flatMap((item) => [item.conversion, item.aov]));
 
   useEffect(() => {
     setMounted(true);
@@ -629,34 +702,42 @@ function PerformancePanel({ chartData, reports }: { chartData: { id: string; con
     <section id="reports" className="bone-card p-5">
       <PanelTitle eyebrow="Personalized vs generic" title="Campaign lift" icon={<BarChart3 size={20} />} />
       <div className="mt-5 h-[280px] min-h-[280px] min-w-0 w-full">
-        {mounted ? (
-          <ResponsiveContainer width="100%" height="100%" minWidth={280} minHeight={260}>
-            <BarChart data={chartData} margin={{ top: 16, right: 0, left: -20, bottom: 0 }}>
-              <CartesianGrid stroke="#e3e3e2" vertical={false} />
-              <XAxis dataKey="id" stroke="#666666" fontSize={11} tickLine={false} axisLine={false} />
-              <YAxis stroke="#666666" fontSize={11} tickLine={false} axisLine={false} />
-              <Tooltip
-                cursor={{ fill: "rgba(113,76,182,0.08)" }}
-                contentStyle={{
-                  background: "#ffffff",
-                  border: "1px solid #e3e3e2",
-                  borderRadius: "16px",
-                  color: "#292827"
-                }}
-              />
-              <Bar dataKey="conversion" fill="#714cb6" radius={[8, 8, 0, 0]} />
-              <Bar dataKey="aov" fill="#d4c7ff" radius={[8, 8, 0, 0]} />
-            </BarChart>
-          </ResponsiveContainer>
+        {reports.length === 0 ? (
+          <EmptyPanel title="No report data" detail="Seed reports to render real campaign lift." />
+        ) : mounted ? (
+          <div className="grid h-full grid-cols-3 items-end gap-4 rounded-2xl border border-[var(--color-fog)] bg-white p-4">
+            {chartData.map((item) => (
+              <div className="grid h-full min-w-0 grid-rows-[1fr_auto] gap-3" key={item.id}>
+                <div className="flex h-full items-end justify-center gap-2 border-b border-[var(--color-fog)] pb-2">
+                  <BarColumn label="Conversion" value={item.conversion} maxValue={maxValue} className="bg-[var(--color-iris)]" />
+                  <BarColumn label="AOV" value={item.aov} maxValue={maxValue} className="bg-[var(--color-lavender-chip)]" />
+                </div>
+                <p className="truncate text-center text-xs capitalize text-[var(--color-graphite)]">{item.id}</p>
+              </div>
+            ))}
+          </div>
         ) : (
           <div className="h-full w-full animate-pulse rounded-2xl border border-[var(--color-fog)] bg-[var(--color-parchment-canvas)]" />
         )}
       </div>
       <div className="mt-5 grid gap-3 sm:grid-cols-2">
-        <MiniStat label="Inventory units moved" value={String(moved)} />
-        <MiniStat label="Repeat orders influenced" value={String(repeat)} />
+        <MiniStat label="Inventory units moved" value={reports.length ? String(moved) : "--"} />
+        <MiniStat label="Repeat orders influenced" value={reports.length ? String(repeat) : "--"} />
       </div>
     </section>
+  );
+}
+
+function BarColumn({ label, value, maxValue, className }: { label: string; value: number; maxValue: number; className: string }) {
+  return (
+    <div className="flex h-full min-w-[42px] flex-col justify-end gap-2">
+      <span className="text-center text-xs font-medium text-[var(--color-graphite)]">{value.toFixed(1)}%</span>
+      <div
+        aria-label={`${label}: ${value.toFixed(1)}%`}
+        className={`min-h-2 rounded-t-lg ${className}`}
+        style={{ height: `${Math.max(8, (value / maxValue) * 190)}px` }}
+      />
+    </div>
   );
 }
 
@@ -677,6 +758,15 @@ function MiniStat({ label, value }: { label: string; value: string }) {
     <div className="rounded-2xl border border-[var(--color-fog)] bg-white p-4">
       <p className="text-xs text-[var(--color-graphite)]">{label}</p>
       <strong className="mt-1 block text-3xl font-semibold leading-none tracking-normal">{value}</strong>
+    </div>
+  );
+}
+
+function EmptyPanel({ title, detail }: { title: string; detail: string }) {
+  return (
+    <div className="rounded-2xl border border-dashed border-[var(--color-driftwood)] bg-[var(--color-parchment-canvas)] p-4">
+      <p className="text-sm font-medium text-[var(--color-ink)]">{title}</p>
+      <p className="mt-1 text-sm leading-6 text-[var(--color-graphite)]">{detail}</p>
     </div>
   );
 }

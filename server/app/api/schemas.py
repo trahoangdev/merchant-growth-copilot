@@ -81,3 +81,7 @@ class PrivacyPreference(BaseModel):
     signal: str
     enabled: bool
     description: str
+
+
+class PrivacyPreferenceUpdate(BaseModel):
+    enabled: bool

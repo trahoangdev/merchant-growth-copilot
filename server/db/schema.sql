@@ -21,6 +21,9 @@ CREATE TABLE IF NOT EXISTS products (
     embedding vector(1536)
 );
 
+ALTER TABLE products
+    ADD COLUMN IF NOT EXISTS created_at TIMESTAMPTZ NOT NULL DEFAULT now();
+
 CREATE TABLE IF NOT EXISTS recommendations (
     id TEXT PRIMARY KEY,
     merchant_id UUID REFERENCES merchants(id),
@@ -35,6 +38,28 @@ CREATE TABLE IF NOT EXISTS recommendations (
     campaign_copy TEXT NOT NULL,
     status TEXT NOT NULL DEFAULT 'draft',
     created_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
+CREATE TABLE IF NOT EXISTS recommendation_products (
+    recommendation_id TEXT NOT NULL REFERENCES recommendations(id) ON DELETE CASCADE,
+    product_id TEXT NOT NULL REFERENCES products(id) ON DELETE CASCADE,
+    PRIMARY KEY (recommendation_id, product_id)
+);
+
+CREATE TABLE IF NOT EXISTS reports (
+    recommendation_id TEXT PRIMARY KEY REFERENCES recommendations(id) ON DELETE CASCADE,
+    conversion_lift_percent NUMERIC(6, 2) NOT NULL,
+    aov_lift_percent NUMERIC(6, 2) NOT NULL,
+    repeat_orders INTEGER NOT NULL,
+    inventory_units_moved INTEGER NOT NULL,
+    estimated_time_saved_hours NUMERIC(6, 2) NOT NULL,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
+CREATE TABLE IF NOT EXISTS privacy (
+    signal TEXT PRIMARY KEY,
+    enabled BOOLEAN NOT NULL DEFAULT true,
+    description TEXT NOT NULL
 );
 
 CREATE TABLE IF NOT EXISTS recommendation_feedback (
