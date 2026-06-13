@@ -1,22 +1,49 @@
-@import url("https://fonts.googleapis.com/css2?family=Barlow:wght@400;500;600;700&family=Oswald:wght@500;600;700&display=swap");
+@import url("https://fonts.googleapis.com/css2?family=Inter:wght@460;500;540;600;700&display=swap");
 
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
 
 :root {
-  --bg: #11120f;
-  --surface: #191b17;
-  --panel: #f4efe4;
-  --text: #f5f1e8;
-  --ink: #161713;
-  --muted: #9d9a90;
-  --primary: #e4a72a;
-  --accent: #36c6a8;
-  --danger: #ef6045;
-  --line: #34362f;
-  --font-display: "Oswald";
-  --font-body: "Barlow";
+  --color-parchment-canvas: #f2f0eb;
+  --color-ink: #292827;
+  --color-bone: #ffffff;
+  --color-fog: #e3e3e2;
+  --color-driftwood: #dcd7d3;
+  --color-graphite: #666666;
+  --color-aubergine: #421d24;
+  --color-aubergine-deep: #4e242c;
+  --color-iris: #714cb6;
+  --color-indigo-glow: #353088;
+  --color-lavender-chip: #d4c7ff;
+  --gradient-hero-dusk-gradient: linear-gradient(
+    to left bottom,
+    rgba(168, 164, 216, 0.5),
+    rgba(107, 165, 232, 0.5),
+    rgba(176, 112, 192, 0.6),
+    rgba(144, 136, 208, 0.5)
+  );
+  --spotlight-violet: radial-gradient(circle at 68% 50%, rgba(133, 125, 250, 0.6) 0, rgba(0, 0, 0, 0) 50%);
+  --spotlight-pink: radial-gradient(circle at 50% 98%, rgba(255, 51, 102, 0.6) 0, rgba(0, 0, 0, 0) 50%);
+  --spotlight-blue: radial-gradient(circle at 93% 50%, rgba(75, 105, 227, 0.5) 0, rgba(0, 0, 0, 0) 50%);
+  --spotlight-cyan: radial-gradient(circle at 50% 75%, rgba(104, 222, 255, 0.5) 0, rgba(0, 0, 0, 0) 50%);
+
+  --bg: var(--color-parchment-canvas);
+  --surface: var(--color-bone);
+  --panel: var(--color-bone);
+  --text: var(--color-ink);
+  --ink: var(--color-ink);
+  --muted: var(--color-graphite);
+  --primary: var(--color-aubergine);
+  --accent: var(--color-iris);
+  --danger: #b33a3a;
+  --line: var(--color-fog);
+
+  --font-super-sans-vf: "Inter", ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  --font-display: var(--font-super-sans-vf);
+  --font-body: var(--font-super-sans-vf);
+  --page-max-width: 1200px;
+  --shadow-subtle: rgb(113, 76, 182) 0 0 0 1px inset;
 }
 
 * {
@@ -30,15 +57,10 @@ html {
 body {
   min-height: 100vh;
   margin: 0;
-  color: var(--text);
-  background:
-    linear-gradient(90deg, rgba(255, 255, 255, 0.035) 1px, transparent 1px),
-    linear-gradient(rgba(255, 255, 255, 0.035) 1px, transparent 1px),
-    radial-gradient(circle at 22% 12%, rgba(228, 167, 42, 0.16), transparent 30%),
-    radial-gradient(circle at 80% 0%, rgba(54, 198, 168, 0.12), transparent 30%),
-    var(--bg);
-  background-size: 48px 48px, 48px 48px, auto, auto, auto;
+  color: var(--color-ink);
+  background: var(--color-parchment-canvas);
   font-family: var(--font-body), sans-serif;
+  font-weight: 460;
 }
 
 button,
@@ -53,35 +75,80 @@ button {
 }
 
 ::selection {
-  color: var(--ink);
-  background: var(--primary);
+  color: var(--color-bone);
+  background: var(--color-iris);
 }
 
-.technical-frame {
+.hero-photography {
+  background:
+    var(--gradient-hero-dusk-gradient),
+    var(--spotlight-violet),
+    var(--spotlight-pink),
+    var(--spotlight-blue),
+    var(--spotlight-cyan),
+    linear-gradient(120deg, rgba(24, 22, 34, 0.92), rgba(66, 29, 36, 0.68)),
+    url("https://images.unsplash.com/photo-1500530855697-b586d89ba3ee?auto=format&fit=crop&w=2400&q=80");
+  background-position: center;
+  background-size: cover;
+}
+
+.glass-panel {
+  border: 1px solid rgba(255, 255, 255, 0.22);
+  background: rgba(255, 255, 255, 0.13);
+  backdrop-filter: blur(12px);
+  color: var(--color-bone);
+}
+
+.bone-card {
+  border: 1px solid var(--color-fog);
+  border-radius: 16px;
+  background: var(--color-bone);
+  color: var(--color-ink);
+}
+
+.iris-focus:focus-visible {
+  outline: none;
+  box-shadow: var(--shadow-subtle);
+}
+
+.ghost-iris {
+  border: 1px solid var(--color-iris);
+  border-radius: 8px;
+  color: var(--color-iris);
+  transition: background-color 0.2s ease, box-shadow 0.2s ease, transform 0.2s ease;
+}
+
+.ghost-iris:hover {
+  background: rgba(113, 76, 182, 0.08);
+  transform: translateY(-1px);
+}
+
+.hero-cta {
   position: relative;
+  overflow: hidden;
+  border-radius: 8px;
+  background: var(--color-bone);
+  color: var(--color-ink);
+  box-shadow: var(--shadow-subtle);
 }
 
-.technical-frame::before {
+.hero-cta::before {
   content: "";
   position: absolute;
-  inset: 0;
-  pointer-events: none;
-  border: 1px solid rgba(244, 239, 228, 0.12);
-  clip-path: polygon(0 0, 100% 0, 100% calc(100% - 18px), calc(100% - 18px) 100%, 0 100%);
+  inset: -2px;
+  z-index: -1;
+  background: conic-gradient(from 0deg, #714cb6, #6ba5e8, #b070c0, #714cb6);
+  opacity: 0;
+  transition: opacity 0.2s ease;
 }
 
-.scanline {
-  background-image: repeating-linear-gradient(
-    0deg,
-    rgba(255, 255, 255, 0.025),
-    rgba(255, 255, 255, 0.025) 1px,
-    transparent 1px,
-    transparent 5px
-  );
+.hero-cta:hover::before {
+  animation: hero-button-gradient-angle-rotate 3.2s linear infinite;
+  opacity: 1;
 }
 
 .reveal {
-  animation: reveal 560ms cubic-bezier(0.22, 1, 0.36, 1) both;
+  animation: reveal 700ms ease both;
 }
 
 @keyframes reveal {
@@ -92,6 +159,12 @@ button {
   to {
     opacity: 1;
     transform: translateY(0);
+  }
+}
+
+@keyframes hero-button-gradient-angle-rotate {
+  to {
+    transform: rotate(1turn);
   }
 }
 

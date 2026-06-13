@@ -1,7 +1,7 @@
 "use client";
 
 import {
-  AlertTriangle,
+  ArrowRight,
   BarChart3,
   Check,
   ChevronRight,
@@ -9,8 +9,8 @@ import {
   Eye,
   LineChart,
   Lock,
+  Mail,
   PackageSearch,
-  RefreshCw,
   Search,
   Settings2,
   ShieldCheck,
@@ -51,10 +51,7 @@ export default function Home() {
   const [goal, setGoal] = useState<MerchantGoal>("repeat_purchase");
   const [searchQuery, setSearchQuery] = useState(quickQueries[0]);
 
-  const recommendationsQuery = useQuery({
-    queryKey: ["recommendations"],
-    queryFn: api.recommendations
-  });
+  const recommendationsQuery = useQuery({ queryKey: ["recommendations"], queryFn: api.recommendations });
   const reportsQuery = useQuery({ queryKey: ["reports"], queryFn: api.reports });
   const privacyQuery = useQuery({ queryKey: ["privacy"], queryFn: api.privacy });
   const searchQueryResult = useQuery({
@@ -70,8 +67,8 @@ export default function Home() {
   });
 
   const recommendations = recommendationsQuery.data ?? [];
-  const selected = recommendations.find((item) => item.id === selectedId) ?? recommendations[0];
   const reports = reportsQuery.data ?? [];
+  const selected = recommendations.find((item) => item.id === selectedId) ?? recommendations[0];
   const report = selected ? reports.find((item) => item.recommendation_id === selected.id) : undefined;
   const activeApproved = recommendations.filter((item) => item.status === "approved").length;
 
@@ -86,93 +83,197 @@ export default function Home() {
   );
 
   return (
-    <main className="min-h-screen">
-      <Header activeApproved={activeApproved} />
+    <main>
+      <Announcement />
+      <Hero
+        activeApproved={activeApproved}
+        recommendations={recommendations}
+        reports={reports}
+        selected={selected}
+        isLoading={recommendationsQuery.isLoading}
+      />
 
-      <div className="mx-auto grid w-full max-w-[1500px] gap-5 px-4 pb-10 pt-4 sm:px-6 lg:grid-cols-[280px_minmax(0,1fr)] lg:px-8">
-        <aside className="technical-frame reveal h-fit bg-surface/88 p-4 backdrop-blur">
-          <MerchantSetup goal={goal} setGoal={setGoal} />
-          <PrivacyControls preferences={privacyQuery.data ?? []} isLoading={privacyQuery.isLoading} />
-        </aside>
+      <section id="cockpit" className="bg-[var(--color-parchment-canvas)] px-4 py-16 sm:px-6 lg:px-8">
+        <div className="mx-auto grid w-full max-w-[1200px] gap-8">
+          <SectionIntro />
 
-        <section className="grid gap-5">
-          <TopMetrics recommendations={recommendations} reports={reports} isLoading={recommendationsQuery.isLoading} />
+          <div className="grid gap-5 lg:grid-cols-[280px_minmax(0,1fr)]">
+            <aside className="grid h-fit gap-5">
+              <MerchantSetup goal={goal} setGoal={setGoal} />
+              <PrivacyControls preferences={privacyQuery.data ?? []} isLoading={privacyQuery.isLoading} />
+            </aside>
 
-          <div className="grid gap-5 xl:grid-cols-[minmax(0,1.05fr)_minmax(420px,0.95fr)]">
-            <RecommendationQueue
-              recommendations={recommendations}
-              selectedId={selected?.id}
-              onSelect={setSelectedId}
-              isLoading={recommendationsQuery.isLoading}
-            />
+            <div className="grid gap-5">
+              <TopMetrics recommendations={recommendations} reports={reports} isLoading={recommendationsQuery.isLoading} />
 
-            <ExplainabilityPanel
-              recommendation={selected}
-              report={report}
-              isPending={updateRecommendation.isPending}
-              onApprove={() => selected && updateRecommendation.mutate({ id: selected.id, status: "approved" })}
-              onReject={() =>
-                selected &&
-                updateRecommendation.mutate({
-                  id: selected.id,
-                  status: "rejected",
-                  reason: "Merchant marked this as too aggressive for brand tone."
-                })
-              }
-            />
+              <div className="grid gap-5 xl:grid-cols-[minmax(0,1fr)_minmax(390px,0.9fr)]">
+                <RecommendationQueue
+                  recommendations={recommendations}
+                  selectedId={selected?.id}
+                  onSelect={setSelectedId}
+                  isLoading={recommendationsQuery.isLoading}
+                />
+                <ExplainabilityPanel
+                  recommendation={selected}
+                  report={report}
+                  isPending={updateRecommendation.isPending}
+                  onApprove={() => selected && updateRecommendation.mutate({ id: selected.id, status: "approved" })}
+                  onReject={() =>
+                    selected &&
+                    updateRecommendation.mutate({
+                      id: selected.id,
+                      status: "rejected",
+                      reason: "Merchant marked this as too aggressive for brand tone."
+                    })
+                  }
+                />
+              </div>
+
+              <div className="grid gap-5 xl:grid-cols-[minmax(0,0.95fr)_minmax(390px,1.05fr)]">
+                <SemanticSearch
+                  query={searchQuery}
+                  goal={goal}
+                  results={searchQueryResult.data ?? []}
+                  isLoading={searchQueryResult.isFetching}
+                  onQueryChange={setSearchQuery}
+                  onGoalChange={setGoal}
+                />
+                <PerformancePanel chartData={chartData} reports={reports} />
+              </div>
+            </div>
           </div>
+        </div>
+      </section>
 
-          <div className="grid gap-5 xl:grid-cols-[minmax(0,0.95fr)_minmax(420px,1.05fr)]">
-            <SemanticSearch
-              query={searchQuery}
-              goal={goal}
-              results={searchQueryResult.data ?? []}
-              isLoading={searchQueryResult.isFetching}
-              onQueryChange={setSearchQuery}
-              onGoalChange={setGoal}
-            />
-            <PerformancePanel chartData={chartData} reports={reports} />
-          </div>
-        </section>
-      </div>
+      <Footer />
     </main>
   );
 }
 
-function Header({ activeApproved }: { activeApproved: number }) {
+function Announcement() {
   return (
-    <header className="border-b border-line bg-bg/84 backdrop-blur">
-      <div className="mx-auto flex max-w-[1500px] flex-col gap-4 px-4 py-5 sm:px-6 lg:flex-row lg:items-center lg:justify-between lg:px-8">
-        <div>
-          <div className="flex flex-wrap items-center gap-3 text-xs font-semibold uppercase text-primary">
-            <span className="inline-flex items-center gap-2">
-              <Sparkles size={16} />
-              Merchant Growth Copilot
-            </span>
-            <span className="h-px w-10 bg-primary" />
-            <span>AI commerce control room</span>
-          </div>
-          <h1 className="mt-2 max-w-4xl font-display text-[clamp(2.1rem,5vw,5.6rem)] uppercase leading-[0.95] tracking-normal">
-            Turn messy shop context into approved growth actions.
-          </h1>
-        </div>
-        <div className="grid min-w-[260px] grid-cols-2 gap-2 text-sm">
-          <StatusTile label="Data mode" value="Mock CSV" icon={<Database size={18} />} />
-          <StatusTile label="Approved" value={String(activeApproved)} icon={<Check size={18} />} />
-        </div>
+    <div className="bg-[var(--color-aubergine)] px-4 py-3 text-[var(--color-bone)] sm:px-6 lg:px-8">
+      <div className="mx-auto flex max-w-[1200px] flex-col gap-2 text-sm font-medium sm:flex-row sm:items-center sm:justify-between">
+        <span>Merchant Growth Copilot is running in mock CSV pilot mode.</span>
+        <a className="rounded-2xl text-sm text-[var(--color-bone)] underline-offset-4 hover:underline" href="#cockpit">
+          Open cockpit
+        </a>
       </div>
-    </header>
+    </div>
   );
 }
 
-function StatusTile({ label, value, icon }: { label: string; value: string; icon: React.ReactNode }) {
+function Hero({
+  activeApproved,
+  recommendations,
+  reports,
+  selected,
+  isLoading
+}: {
+  activeApproved: number;
+  recommendations: Recommendation[];
+  reports: CampaignReport[];
+  selected?: Recommendation;
+  isLoading: boolean;
+}) {
+  const averageConversion = reports.length
+    ? reports.reduce((sum, item) => sum + item.conversion_lift_percent, 0) / reports.length
+    : 0;
+
   return (
-    <div className="technical-frame bg-surface px-4 py-3">
-      <div className="flex items-center justify-between text-muted">
-        <span className="text-xs uppercase">{label}</span>
-        {icon}
+    <section className="hero-photography relative min-h-screen overflow-hidden text-[var(--color-bone)]">
+      <nav className="sticky top-0 z-20 border-b border-white/10 bg-white/8 px-4 py-4 backdrop-blur-md sm:px-6 lg:px-8">
+        <div className="mx-auto flex max-w-[1200px] items-center justify-between gap-4">
+          <a className="flex items-center gap-2 text-sm font-semibold" href="#">
+            <Sparkles size={18} />
+            Merchant Growth
+          </a>
+          <div className="hidden items-center gap-6 text-sm font-medium md:flex">
+            <a href="#cockpit">Dashboard</a>
+            <a href="#search">Search</a>
+            <a href="#reports">Reports</a>
+          </div>
+          <a className="rounded-lg bg-[var(--color-lavender-chip)] px-3 py-2 text-sm font-medium text-[var(--color-ink)]" href="#cockpit">
+            Sign up
+          </a>
+        </div>
+      </nav>
+
+      <div className="mx-auto grid min-h-[calc(100vh-73px)] max-w-[1200px] items-center gap-10 px-4 py-16 sm:px-6 lg:grid-cols-[minmax(0,0.94fr)_minmax(360px,0.76fr)] lg:px-8">
+        <div className="reveal">
+          <div className="mb-8 inline-flex items-center gap-2 rounded-full glass-panel px-4 py-3 text-sm font-medium">
+            <ShieldCheck size={16} />
+            Human-approved AI commerce actions
+          </div>
+          <h1 className="max-w-4xl text-[48px] font-semibold leading-[0.96] tracking-normal sm:text-[64px]">
+            Turn messy shop context into approved growth actions.
+          </h1>
+          <p className="mt-6 max-w-2xl text-lg leading-7 text-white/88 sm:text-xl">
+            A cinematic control room for semantic product search, explainable recommendations, privacy controls, and campaign lift reporting.
+          </p>
+          <div className="mt-8 flex flex-wrap gap-3">
+            <a className="hero-cta iris-focus inline-flex items-center gap-2 px-6 py-3 text-base font-medium" href="#cockpit">
+              Get the cockpit
+              <ArrowRight size={18} className="text-[var(--color-iris)]" />
+            </a>
+            <a className="glass-panel inline-flex items-center gap-2 rounded-lg px-6 py-3 text-base font-medium" href="#search">
+              Try search
+            </a>
+          </div>
+        </div>
+
+        <div className="relative grid gap-4">
+          <div className="glass-panel rounded-3xl p-5">
+            <div className="mb-4 flex items-center justify-between">
+              <span className="text-sm font-medium text-white/70">Today</span>
+              <Database size={18} />
+            </div>
+            <div className="grid grid-cols-3 gap-3">
+              <HeroStat label="Actions" value={isLoading ? "--" : String(recommendations.length)} />
+              <HeroStat label="Lift" value={`${averageConversion.toFixed(1)}%`} />
+              <HeroStat label="Approved" value={String(activeApproved)} />
+            </div>
+          </div>
+
+          <div className="glass-panel ml-0 rounded-3xl p-5 shadow-none lg:ml-10">
+            <div className="flex items-center gap-2 text-sm font-medium text-white/70">
+              <Eye size={16} />
+              Why this, why now
+            </div>
+            <h2 className="mt-3 text-2xl font-semibold leading-tight">{selected?.title ?? "Loading recommendation"}</h2>
+            <p className="mt-3 text-sm leading-6 text-white/72">{selected?.risk_flag ?? "Preparing context from mock commerce data."}</p>
+          </div>
+
+          <div className="glass-panel mr-0 rounded-full px-5 py-4 text-sm font-medium text-white/86 lg:mr-16">
+            Staff query: gift under 300k for office worker
+          </div>
+        </div>
       </div>
-      <strong className="mt-2 block font-display text-2xl uppercase">{value}</strong>
+    </section>
+  );
+}
+
+function HeroStat({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="rounded-2xl bg-white/12 p-3">
+      <p className="text-xs text-white/65">{label}</p>
+      <strong className="mt-1 block text-2xl font-semibold">{value}</strong>
+    </div>
+  );
+}
+
+function SectionIntro() {
+  return (
+    <div className="grid gap-5 border-b border-[var(--color-driftwood)] pb-8 lg:grid-cols-[0.9fr_0.6fr] lg:items-end">
+      <div>
+        <p className="mb-3 text-sm font-medium text-[var(--color-iris)]">AI commerce suite</p>
+        <h2 className="max-w-3xl text-5xl font-semibold leading-none tracking-normal text-[var(--color-ink)]">
+          All merchant decisions in one warm, explainable cockpit.
+        </h2>
+      </div>
+      <p className="text-base leading-7 text-[var(--color-graphite)]">
+        The panels below keep the original MVP workflow intact: configure data signals, rank recommendations, inspect evidence, approve exports, search products, and read lift.
+      </p>
     </div>
   );
 }
@@ -185,24 +286,24 @@ function MerchantSetup({
   setGoal: (goal: MerchantGoal) => void;
 }) {
   return (
-    <section className="space-y-4">
-      <div className="flex items-center gap-2">
-        <Settings2 size={18} className="text-primary" />
-        <h2 className="font-display text-2xl uppercase">Growth setup</h2>
+    <section className="bone-card p-4">
+      <div className="flex items-center gap-2 text-[var(--color-iris)]">
+        <Settings2 size={18} />
+        <h2 className="text-2xl font-semibold tracking-normal text-[var(--color-ink)]">Growth setup</h2>
       </div>
-      <div className="scanline border border-line bg-bg/70 p-3">
-        <p className="text-xs uppercase text-muted">Merchant</p>
+      <div className="mt-5 rounded-2xl border border-[var(--color-fog)] bg-[var(--color-parchment-canvas)] p-4">
+        <p className="text-xs font-medium text-[var(--color-graphite)]">Merchant</p>
         <p className="mt-1 font-semibold">Linh Cosmetics</p>
-        <p className="text-sm text-muted">Cosmetics, personal care, accessories</p>
+        <p className="text-sm leading-6 text-[var(--color-graphite)]">Cosmetics, personal care, accessories</p>
       </div>
-      <label className="block text-xs font-semibold uppercase text-muted" htmlFor="goal">
+      <label className="mt-5 block text-xs font-medium text-[var(--color-graphite)]" htmlFor="goal">
         Primary goal
       </label>
       <select
         id="goal"
         value={goal}
         onChange={(event) => setGoal(event.target.value as MerchantGoal)}
-        className="w-full border border-line bg-bg px-3 py-3 text-sm text-text outline-none transition focus:border-primary"
+        className="iris-focus mt-2 w-full rounded-lg border border-[var(--color-fog)] bg-white px-3 py-3 text-sm text-[var(--color-ink)]"
       >
         {Object.entries(goalLabels).map(([value, label]) => (
           <option value={value} key={value}>
@@ -210,12 +311,12 @@ function MerchantSetup({
           </option>
         ))}
       </select>
-      <div className="grid grid-cols-2 gap-2 text-xs">
-        <button className="flex items-center justify-center gap-2 border border-line bg-bg px-3 py-2 uppercase text-muted transition hover:border-primary hover:text-primary">
+      <div className="mt-4 grid grid-cols-2 gap-2 text-xs">
+        <button className="ghost-iris flex items-center justify-center gap-2 px-3 py-2 font-medium">
           <Upload size={15} />
           CSV ready
         </button>
-        <button className="flex items-center justify-center gap-2 border border-line bg-bg px-3 py-2 uppercase text-muted transition hover:border-accent hover:text-accent">
+        <button className="ghost-iris flex items-center justify-center gap-2 px-3 py-2 font-medium">
           <ShieldCheck size={15} />
           Approval on
         </button>
@@ -232,26 +333,28 @@ function PrivacyControls({
   isLoading: boolean;
 }) {
   return (
-    <section className="mt-8 space-y-3">
-      <div className="flex items-center gap-2">
-        <Lock size={18} className="text-accent" />
-        <h2 className="font-display text-xl uppercase">Signal control</h2>
+    <section className="bone-card p-4">
+      <div className="flex items-center gap-2 text-[var(--color-iris)]">
+        <Lock size={18} />
+        <h2 className="text-2xl font-semibold tracking-normal text-[var(--color-ink)]">Signal control</h2>
       </div>
-      {isLoading ? (
-        <SkeletonLines count={4} />
-      ) : (
-        preferences.map((item) => (
-          <div className="border border-line bg-bg/70 p-3" key={item.signal}>
-            <div className="flex items-center justify-between gap-3">
-              <span className="text-sm font-semibold uppercase">{item.signal.replace("_", " ")}</span>
-              <span className={item.enabled ? "text-xs text-accent" : "text-xs text-muted"}>
-                {item.enabled ? "Enabled" : "Paused"}
-              </span>
+      <div className="mt-5 space-y-3">
+        {isLoading ? (
+          <SkeletonLines count={4} />
+        ) : (
+          preferences.map((item) => (
+            <div className="rounded-2xl border border-[var(--color-fog)] bg-white p-4" key={item.signal}>
+              <div className="flex items-center justify-between gap-3">
+                <span className="text-sm font-semibold">{item.signal.replace("_", " ")}</span>
+                <span className={item.enabled ? "text-xs font-medium text-[var(--color-iris)]" : "text-xs text-[var(--color-graphite)]"}>
+                  {item.enabled ? "Enabled" : "Paused"}
+                </span>
+              </div>
+              <p className="mt-2 text-sm leading-6 text-[var(--color-graphite)]">{item.description}</p>
             </div>
-            <p className="mt-2 text-sm leading-relaxed text-muted">{item.description}</p>
-          </div>
-        ))
-      )}
+          ))
+        )}
+      </div>
     </section>
   );
 }
@@ -274,7 +377,7 @@ function TopMetrics({
     <section className="grid gap-3 md:grid-cols-4">
       <Metric label="Growth actions" value={isLoading ? "--" : String(recommendations.length)} icon={<PackageSearch size={20} />} />
       <Metric label="Avg conversion lift" value={`${averageConversion.toFixed(1)}%`} icon={<LineChart size={20} />} />
-      <Metric label="Planning time saved" value={`${totalTime.toFixed(1)}h`} icon={<RefreshCw size={20} />} />
+      <Metric label="Planning time saved" value={`${totalTime.toFixed(1)}h`} icon={<Mail size={20} />} />
       <Metric label="Approval mode" value="Human" icon={<ShieldCheck size={20} />} />
     </section>
   );
@@ -282,12 +385,12 @@ function TopMetrics({
 
 function Metric({ label, value, icon }: { label: string; value: string; icon: React.ReactNode }) {
   return (
-    <article className="technical-frame reveal bg-panel p-4 text-[var(--ink)]">
-      <div className="flex items-center justify-between text-[var(--ink)]/70">
-        <span className="text-xs font-bold uppercase">{label}</span>
+    <article className="bone-card p-4">
+      <div className="flex items-center justify-between text-[var(--color-graphite)]">
+        <span className="text-xs font-medium">{label}</span>
         {icon}
       </div>
-      <strong className="mt-4 block font-display text-4xl uppercase leading-none">{value}</strong>
+      <strong className="mt-4 block text-4xl font-semibold leading-none tracking-normal">{value}</strong>
     </article>
   );
 }
@@ -304,15 +407,9 @@ function RecommendationQueue({
   isLoading: boolean;
 }) {
   return (
-    <section className="technical-frame bg-surface p-4">
-      <div className="mb-4 flex items-center justify-between gap-3">
-        <div>
-          <p className="text-xs font-semibold uppercase text-primary">Ranked by expected value</p>
-          <h2 className="font-display text-3xl uppercase">Action queue</h2>
-        </div>
-        <BarChart3 className="text-muted" />
-      </div>
-      <div className="space-y-3">
+    <section className="bone-card p-4">
+      <PanelTitle eyebrow="Ranked by expected value" title="Action queue" icon={<BarChart3 size={20} />} />
+      <div className="mt-5 space-y-3">
         {isLoading ? (
           <SkeletonLines count={3} />
         ) : (
@@ -320,18 +417,18 @@ function RecommendationQueue({
             <button
               key={item.id}
               onClick={() => onSelect(item.id)}
-              className={`group w-full border p-4 text-left transition ${
+              className={`iris-focus group w-full rounded-2xl border p-4 text-left transition ${
                 selectedId === item.id
-                  ? "border-primary bg-primary text-[var(--ink)]"
-                  : "border-line bg-bg/70 text-text hover:border-accent"
+                  ? "border-[var(--color-iris)] bg-[var(--color-fog)]"
+                  : "border-[var(--color-fog)] bg-white hover:border-[var(--color-iris)]"
               }`}
             >
               <div className="flex items-start justify-between gap-4">
-                <span className="font-display text-4xl leading-none">{String(index + 1).padStart(2, "0")}</span>
-                <ChevronRight className="mt-1 shrink-0 transition group-hover:translate-x-1" size={18} />
+                <span className="text-3xl font-semibold leading-none text-[var(--color-iris)]">{String(index + 1).padStart(2, "0")}</span>
+                <ChevronRight className="mt-1 shrink-0 text-[var(--color-iris)] transition group-hover:translate-x-1" size={18} />
               </div>
-              <h3 className="mt-3 text-xl font-semibold leading-tight">{item.title}</h3>
-              <div className="mt-4 grid gap-2 text-sm sm:grid-cols-2">
+              <h3 className="mt-3 text-xl font-semibold leading-tight tracking-normal">{item.title}</h3>
+              <div className="mt-4 grid gap-2 text-sm text-[var(--color-graphite)] sm:grid-cols-2">
                 <span>{item.action_type}</span>
                 <span>{Math.round(item.confidence * 100)}% confidence</span>
                 <span>{item.timing}</span>
@@ -360,57 +457,57 @@ function ExplainabilityPanel({
 }) {
   if (!recommendation) {
     return (
-      <section className="technical-frame min-h-[420px] bg-surface p-5">
+      <section className="bone-card min-h-[420px] p-5">
         <SkeletonLines count={8} />
       </section>
     );
   }
 
   return (
-    <section className="technical-frame bg-surface p-5">
+    <section className="bone-card p-5">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
-          <p className="flex items-center gap-2 text-xs font-semibold uppercase text-accent">
+          <p className="flex items-center gap-2 text-xs font-medium text-[var(--color-iris)]">
             <Eye size={16} />
             Why this, why now
           </p>
-          <h2 className="mt-2 font-display text-4xl uppercase leading-none">{recommendation.action_type}</h2>
+          <h2 className="mt-2 text-4xl font-semibold leading-none tracking-normal">{recommendation.action_type}</h2>
         </div>
-        <span className="border border-line px-3 py-2 text-xs uppercase text-muted">{recommendation.status}</span>
+        <span className="rounded-lg border border-[var(--color-fog)] px-3 py-2 text-xs text-[var(--color-graphite)]">{recommendation.status}</span>
       </div>
 
       <p className="mt-5 text-xl font-semibold leading-snug">{recommendation.title}</p>
-      <p className="mt-3 text-muted">{recommendation.target_segment}</p>
+      <p className="mt-3 text-[var(--color-graphite)]">{recommendation.target_segment}</p>
 
-      <div className="mt-5 grid gap-3 sm:grid-cols-3">
+      <div className="mt-5 grid gap-3 sm:grid-cols-2">
         {recommendation.products.map((product) => (
-          <article className="border border-line bg-bg/72 p-3" key={product.id}>
+          <article className="rounded-2xl border border-[var(--color-fog)] bg-[var(--color-parchment-canvas)] p-4" key={product.id}>
             <p className="text-sm font-semibold">{product.name}</p>
-            <p className="mt-2 text-xs uppercase text-muted">{formatVnd(product.price_vnd)}</p>
-            <p className="mt-1 text-xs text-accent">{product.stock} in stock</p>
+            <p className="mt-2 text-xs text-[var(--color-graphite)]">{formatVnd(product.price_vnd)}</p>
+            <p className="mt-1 text-xs font-medium text-[var(--color-iris)]">{product.stock} in stock</p>
           </article>
         ))}
       </div>
 
-      <div className="mt-5 border border-line bg-bg/72 p-4">
-        <div className="flex items-center gap-2 text-primary">
-          <AlertTriangle size={17} />
-          <span className="text-sm font-semibold uppercase">Risk flag</span>
+      <div className="mt-5 rounded-2xl border border-[var(--color-fog)] bg-[var(--color-parchment-canvas)] p-4">
+        <div className="flex items-center gap-2 text-[var(--color-iris)]">
+          <ShieldCheck size={17} />
+          <span className="text-sm font-medium">Risk flag</span>
         </div>
-        <p className="mt-2 text-sm text-muted">{recommendation.risk_flag}</p>
+        <p className="mt-2 text-sm leading-6 text-[var(--color-graphite)]">{recommendation.risk_flag}</p>
       </div>
 
       <div className="mt-5 space-y-2">
         {recommendation.evidence.map((item) => (
-          <div className="flex gap-3 border-b border-line pb-2 text-sm text-muted" key={item}>
-            <span className="mt-1 h-2 w-2 shrink-0 bg-primary" />
+          <div className="flex gap-3 border-b border-[var(--color-fog)] pb-2 text-sm leading-6 text-[var(--color-graphite)]" key={item}>
+            <span className="mt-2 h-2 w-2 shrink-0 rounded-full bg-[var(--color-iris)]" />
             <span>{item}</span>
           </div>
         ))}
       </div>
 
-      <div className="mt-5 border border-line bg-panel p-4 text-[var(--ink)]">
-        <p className="text-xs font-bold uppercase">Editable campaign copy</p>
+      <div className="mt-5 rounded-2xl border border-[var(--color-fog)] bg-[var(--color-parchment-canvas)] p-4">
+        <p className="text-xs font-medium text-[var(--color-iris)]">Editable campaign copy</p>
         <p className="mt-2 text-lg font-semibold leading-snug">{recommendation.campaign_copy}</p>
       </div>
 
@@ -425,7 +522,7 @@ function ExplainabilityPanel({
         <button
           onClick={onApprove}
           disabled={isPending}
-          className="flex items-center justify-center gap-2 bg-accent px-4 py-3 font-bold uppercase text-[var(--ink)] transition hover:brightness-110 disabled:opacity-55"
+          className="iris-focus flex items-center justify-center gap-2 rounded-lg bg-[var(--color-aubergine)] px-4 py-3 font-medium text-white transition hover:bg-[var(--color-aubergine-deep)] disabled:opacity-55"
         >
           <Check size={18} />
           Approve export
@@ -433,7 +530,7 @@ function ExplainabilityPanel({
         <button
           onClick={onReject}
           disabled={isPending}
-          className="flex items-center justify-center gap-2 border border-line px-4 py-3 font-bold uppercase text-muted transition hover:border-danger hover:text-danger disabled:opacity-55"
+          className="ghost-iris flex items-center justify-center gap-2 px-4 py-3 font-medium disabled:opacity-55"
         >
           <ThumbsDown size={18} />
           Reject
@@ -459,26 +556,19 @@ function SemanticSearch({
   onGoalChange: (goal: MerchantGoal) => void;
 }) {
   return (
-    <section className="technical-frame bg-surface p-5">
-      <div className="mb-4">
-        <p className="flex items-center gap-2 text-xs font-semibold uppercase text-primary">
-          <Search size={16} />
-          Staff semantic search
-        </p>
-        <h2 className="mt-2 font-display text-3xl uppercase">Buyer intent lookup</h2>
-      </div>
-
-      <div className="grid gap-3 md:grid-cols-[1fr_190px]">
+    <section id="search" className="bone-card p-5">
+      <PanelTitle eyebrow="Staff semantic search" title="Buyer intent lookup" icon={<Search size={20} />} />
+      <div className="mt-5 grid gap-3 md:grid-cols-[1fr_190px]">
         <input
           value={query}
           onChange={(event) => onQueryChange(event.target.value)}
-          className="border border-line bg-bg px-4 py-3 text-text outline-none transition placeholder:text-muted focus:border-primary"
+          className="iris-focus w-full rounded-lg border border-[var(--color-fog)] bg-white px-4 py-3 text-[var(--color-ink)] placeholder:text-[var(--color-graphite)]"
           placeholder="Search by customer need, budget, occasion..."
         />
         <select
           value={goal}
           onChange={(event) => onGoalChange(event.target.value as MerchantGoal)}
-          className="border border-line bg-bg px-3 py-3 text-text outline-none transition focus:border-primary"
+          className="iris-focus rounded-lg border border-[var(--color-fog)] bg-white px-3 py-3 text-[var(--color-ink)]"
         >
           {Object.entries(goalLabels).map(([value, label]) => (
             <option value={value} key={value}>
@@ -490,11 +580,7 @@ function SemanticSearch({
 
       <div className="mt-3 flex flex-wrap gap-2">
         {quickQueries.map((item) => (
-          <button
-            key={item}
-            onClick={() => onQueryChange(item)}
-            className="border border-line px-3 py-2 text-xs uppercase text-muted transition hover:border-accent hover:text-accent"
-          >
+          <button key={item} onClick={() => onQueryChange(item)} className="ghost-iris px-3 py-2 text-xs font-medium">
             {item}
           </button>
         ))}
@@ -505,17 +591,19 @@ function SemanticSearch({
           <SkeletonLines count={4} />
         ) : (
           results.map((result) => (
-            <article className="border border-line bg-bg/72 p-4" key={result.product.id}>
+            <article className="rounded-2xl border border-[var(--color-fog)] bg-white p-4" key={result.product.id}>
               <div className="flex flex-wrap items-start justify-between gap-3">
                 <div>
                   <h3 className="text-lg font-semibold">{result.product.name}</h3>
-                  <p className="mt-1 text-sm text-muted">{result.match_reason}</p>
+                  <p className="mt-1 text-sm leading-6 text-[var(--color-graphite)]">{result.match_reason}</p>
                 </div>
-                <span className="bg-primary px-2 py-1 text-xs font-bold text-[var(--ink)]">{result.score.toFixed(1)}</span>
+                <span className="rounded-lg border border-[var(--color-iris)] px-2 py-1 text-xs font-medium text-[var(--color-iris)]">
+                  {result.score.toFixed(1)}
+                </span>
               </div>
               <div className="mt-3 flex flex-wrap gap-2">
                 {result.product.tags.slice(0, 4).map((tag) => (
-                  <span className="border border-line px-2 py-1 text-xs text-muted" key={tag}>
+                  <span className="rounded-full bg-[var(--color-fog)] px-3 py-1 text-xs text-[var(--color-graphite)]" key={tag}>
                     {tag}
                   </span>
                 ))}
@@ -538,35 +626,30 @@ function PerformancePanel({ chartData, reports }: { chartData: { id: string; con
   }, []);
 
   return (
-    <section className="technical-frame bg-surface p-5">
-      <div className="mb-4 flex items-center justify-between gap-3">
-        <div>
-          <p className="text-xs font-semibold uppercase text-accent">Personalized vs generic</p>
-          <h2 className="font-display text-3xl uppercase">Campaign lift</h2>
-        </div>
-        <BarChart3 className="text-muted" />
-      </div>
-      <div className="h-[280px] min-h-[280px] min-w-0 w-full">
+    <section id="reports" className="bone-card p-5">
+      <PanelTitle eyebrow="Personalized vs generic" title="Campaign lift" icon={<BarChart3 size={20} />} />
+      <div className="mt-5 h-[280px] min-h-[280px] min-w-0 w-full">
         {mounted ? (
           <ResponsiveContainer width="100%" height="100%" minWidth={280} minHeight={260}>
             <BarChart data={chartData} margin={{ top: 16, right: 0, left: -20, bottom: 0 }}>
-              <CartesianGrid stroke="rgba(244,239,228,0.14)" vertical={false} />
-              <XAxis dataKey="id" stroke="#9d9a90" fontSize={11} tickLine={false} axisLine={false} />
-              <YAxis stroke="#9d9a90" fontSize={11} tickLine={false} axisLine={false} />
+              <CartesianGrid stroke="#e3e3e2" vertical={false} />
+              <XAxis dataKey="id" stroke="#666666" fontSize={11} tickLine={false} axisLine={false} />
+              <YAxis stroke="#666666" fontSize={11} tickLine={false} axisLine={false} />
               <Tooltip
-                cursor={{ fill: "rgba(228,167,42,0.08)" }}
+                cursor={{ fill: "rgba(113,76,182,0.08)" }}
                 contentStyle={{
-                  background: "#191b17",
-                  border: "1px solid #34362f",
-                  color: "#f5f1e8"
+                  background: "#ffffff",
+                  border: "1px solid #e3e3e2",
+                  borderRadius: "16px",
+                  color: "#292827"
                 }}
               />
-              <Bar dataKey="conversion" fill="#e4a72a" radius={[0, 0, 0, 0]} />
-              <Bar dataKey="aov" fill="#36c6a8" radius={[0, 0, 0, 0]} />
+              <Bar dataKey="conversion" fill="#714cb6" radius={[8, 8, 0, 0]} />
+              <Bar dataKey="aov" fill="#d4c7ff" radius={[8, 8, 0, 0]} />
             </BarChart>
           </ResponsiveContainer>
         ) : (
-          <div className="h-full w-full animate-pulse border border-line bg-bg/70" />
+          <div className="h-full w-full animate-pulse rounded-2xl border border-[var(--color-fog)] bg-[var(--color-parchment-canvas)]" />
         )}
       </div>
       <div className="mt-5 grid gap-3 sm:grid-cols-2">
@@ -577,11 +660,23 @@ function PerformancePanel({ chartData, reports }: { chartData: { id: string; con
   );
 }
 
+function PanelTitle({ eyebrow, title, icon }: { eyebrow: string; title: string; icon: React.ReactNode }) {
+  return (
+    <div className="flex items-start justify-between gap-3">
+      <div>
+        <p className="text-xs font-medium text-[var(--color-iris)]">{eyebrow}</p>
+        <h2 className="mt-1 text-3xl font-semibold leading-tight tracking-normal">{title}</h2>
+      </div>
+      <span className="text-[var(--color-iris)]">{icon}</span>
+    </div>
+  );
+}
+
 function MiniStat({ label, value }: { label: string; value: string }) {
   return (
-    <div className="border border-line bg-bg/70 p-3">
-      <p className="text-xs uppercase text-muted">{label}</p>
-      <strong className="mt-1 block font-display text-3xl uppercase">{value}</strong>
+    <div className="rounded-2xl border border-[var(--color-fog)] bg-white p-4">
+      <p className="text-xs text-[var(--color-graphite)]">{label}</p>
+      <strong className="mt-1 block text-3xl font-semibold leading-none tracking-normal">{value}</strong>
     </div>
   );
 }
@@ -590,8 +685,31 @@ function SkeletonLines({ count }: { count: number }) {
   return (
     <div className="space-y-3">
       {Array.from({ length: count }).map((_, index) => (
-        <div className="h-12 animate-pulse bg-line/60" key={index} />
+        <div className="h-12 animate-pulse rounded-2xl bg-[var(--color-fog)]" key={index} />
       ))}
     </div>
+  );
+}
+
+function Footer() {
+  return (
+    <footer className="bg-[var(--color-aubergine)] px-4 py-10 text-[var(--color-bone)] sm:px-6 lg:px-8">
+      <div className="mx-auto grid max-w-[1200px] gap-8 md:grid-cols-[1fr_2fr]">
+        <div>
+          <div className="flex items-center gap-2 font-semibold">
+            <Sparkles size={18} />
+            Merchant Growth
+          </div>
+          <p className="mt-3 max-w-sm text-sm leading-6 text-white/72">
+            Explainable AI recommendations for merchants who want speed without losing control.
+          </p>
+        </div>
+        <div className="grid gap-5 text-sm sm:grid-cols-3">
+          <a href="#cockpit">Dashboard</a>
+          <a href="#search">Product search</a>
+          <a href="#reports">Campaign reports</a>
+        </div>
+      </div>
+    </footer>
   );
 }
